@@ -15,6 +15,14 @@ async def update_subscription(data, interaction, role, status):
         json.dump(data, f, indent=4)
     await interaction.response.send_message(f"This channel will start posting and {status}", ephemeral=True)
 
+def create_if_not_exists():
+    data = {}
+    if not os.path.exists("data.json"):
+        writing_json(data)
+    else:
+        data = reading_json()
+    return data
+
 def writing_json(data):
     with open("data.json", 'w') as f:
         json.dump(data, f, indent=4)
@@ -46,12 +54,7 @@ def run():
         else:
             status = "no role will be pinged"
         
-        # if file does not exist
-        data = {}
-        if not os.path.exists("data.json"):
-            writing_json(data)
-        else:
-            data = reading_json()
+        data = create_if_not_exists()
 
         try: # update info if guild has entry in json file
             del data[str(interaction.guild_id)]
@@ -61,7 +64,7 @@ def run():
     
     @bot.tree.command(name="unsubscribe", description="stop sharing calls in current channel")
     async def unsubscribe(interaction: discord.Interaction):
-        data = reading_json()
+        data = create_if_not_exists()
         try:  # delete guild entry in json file
             del data[str(interaction.guild_id)]
             writing_json(data)
@@ -97,7 +100,7 @@ class FeedbackModal(discord.ui.Modal, title="Send us your feedback"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        data = reading_json()
+        data = create_if_not_exists()
         if not len(data):
             return await interaction.response.send_message("There are no subscriptions", ephemeral=True)
         await interaction.response.send_message(f"Generating the call", ephemeral=True)
