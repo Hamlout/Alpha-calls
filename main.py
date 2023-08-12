@@ -2,10 +2,9 @@ import os
 import json
 
 import discord
-from discord import app_commands
 from discord.ext import commands
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
 
@@ -16,13 +15,16 @@ async def update_subscription(data, interaction, role, status):
     await interaction.response.send_message(f"This channel will start posting and {status}", ephemeral=True)
 
 def reading_from_json():
-    try:  # if file exist
-        with open("data.json", 'r') as f:
-            data = json.load(f)
-    except FileNotFoundError: # if file does not exist
-        data = {}
+    # if file does not exist
+    data = {}
+    if not os.path.exists("data.json"):
         with open("data.json", 'w') as f:
             json.dump(data, f, indent=4)
+    
+    # if file exist
+    with open("data.json", 'r') as f:
+        data = json.load(f)
+        
     return data
 
 def run():
@@ -39,7 +41,7 @@ def run():
 
     @bot.tree.command(name="subscribe", description="Share calls in current channel")
     async def subscribe(interaction: discord.Interaction, role: discord.Role = None):
-        # Check for role if provided
+        # Check for role if provided or not
         if role:
             status = f"{role.mention} will be pinged"
             role = role.id
@@ -48,10 +50,10 @@ def run():
 
         data = reading_from_json()
 
-        try: # if guild is subscribed, delete the old info then update the new ones
+        try: # update info if guild has entry in json file
             del data[str(interaction.guild_id)]
             await update_subscription(data, interaction, role, status)
-        except KeyError: # if guild is not subscribed, just update the new info
+        except KeyError: # add info if guild has no entry in json file
             await update_subscription(data, interaction, role, status)
     
     @bot.tree.command(name="unsubscribe", description="stop sharing calls in current channel")
@@ -59,12 +61,12 @@ def run():
 
         data = reading_from_json()
 
-        try:
+        try:  # delete guild entry in json file
             del data[str(interaction.guild_id)]
             with open("data.json", 'w') as f:
                 json.dump(data, f, indent=4)
             await interaction.response.send_message(f"This channel will stop posting calls", ephemeral=True)
-        except KeyError:
+        except KeyError:  # if guild is not subscribed. nothing to delete
             await interaction.response.send_message(f"This guild is not subscribed", ephemeral=True)
 
     @bot.tree.command(name="call", description="Make call")
@@ -90,24 +92,36 @@ class FeedbackModal(discord.ui.Modal, title="Send us your feedback"):
         style=discord.TextStyle.long,
         label="Message",
         required=True,
-        max_length=500,
+        max_length=1000,
         placeholder="Message content"
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        channel = interaction.guild.get_channel(973631848712372324)
-        embed = discord.Embed(title=self.fb_title.value,
-                              description=self.message.value,
-                              color=discord.Color.yellow()
-                              )
-        print(self.image)
-        embed.set_image(url=self.image)
-        embed.set_footer(text=self.user.nick)
-        try:
-            await channel.send(embed=embed)
-            await interaction.response.send_message(f"Thank you, {self.user.nick}", ephemeral=True)
-        except discord.errors.Forbidden:
-            await interaction.response.send_message(f"Make sure the bot has the correct permissions", ephemeral=True)
+        await interaction.response.send_message(f"Generating the call", ephemeral=True)
+        with open("data.json", 'r') as f:
+            data = json.load(f)
+        for server in data:  # loop over all the servers added
+            # get the objects
+            channel_id = data[server]['channel']
+            role_id = data[server]['role']
+            guild = interaction.client.get_guild(int(server))
+            if guild:
+                role = guild.get_role(role_id)
+                channel = guild.get_channel(channel_id)
+                # generating the embed
+                embed = discord.Embed(title=self.fb_title.value,
+                                    description=self.message.value,
+                                    color=discord.Color.yellow()
+                                    )
+                embed.set_image(url=self.image)
+                embed.set_footer(text=self.user.nick)
+                content = ""
+                if role: # check if role is added to ping
+                    content = f"{role.mention}"
+                try:
+                    await channel.send(content=content, embed=embed)
+                except discord.errors.Forbidden:
+                    await channel.send(f"Make sure the bot has the correct permissions", ephemeral=True)
 
 if __name__ == "__main__":
     run()
