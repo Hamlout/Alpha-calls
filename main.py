@@ -74,7 +74,7 @@ def run():
 
     @bot.tree.command(name="call", description="Make call")
     async def call(interaction: discord.Interaction, file: discord.Attachment = None):
-        feedback_modal = FeedbackModal()
+        feedback_modal = Subscriptions()
         feedback_modal.user = interaction.user
         feedback_modal.image = None
         if file:
@@ -83,7 +83,7 @@ def run():
 
     bot.run(token)
 
-class FeedbackModal(discord.ui.Modal, title="Send us your feedback"):
+class Subscriptions(discord.ui.Modal, title="Send us your feedback"):
     call_title = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Title",
